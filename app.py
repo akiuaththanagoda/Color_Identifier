@@ -7,45 +7,99 @@ import plotly.graph_objects as go
 from PIL import Image
 import math
 import io
+import time
+from datetime import datetime
 
-# ==========================================
-# 1. PAGE CONFIGURATION & SECURITY AUTH
-# ==========================================
 st.set_page_config(
-    page_title="Ocean Lanka - Color Variation Identifier",
+    page_title="Ocean Lanka - AI Color Precision Suite",
     page_icon="🎨",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Application Password Gate
-def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
+st.markdown("""
+<style>
+    .main { background-color: #0E1117; }
+    .stApp { max-width: 100%; }
+    .metric-card {
+        background: linear-gradient(135deg, #1E2640 0%, #0F172A 100%);
+        border: 1px solid #334155;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        text-align: center;
+    }
+    .status-badge-a { background-color: #059669; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
+    .status-badge-b { background-color: #D97706; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
+    .status-badge-c { background-color: #DC2626; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
+    .realtime-clock {
+        font-size: 14px;
+        font-weight: 600;
+        color: #38BDF8;
+        background: #1E293B;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #0EA5E9;
+        display: inline-block;
+    }
+</style>
+""", unsafe_allow_html=True)
 
+def speak_voice(text):
+    """ Synthesizes Speech via Browser Speech API """
+    js_code = f"""
+    <script>
+        var msg = new SpeechSynthesisUtterance('{text}');
+        msg.rate = 0.95;
+        msg.pitch = 1.0;
+        window.speechSynthesis.speak(msg);
+    </script>
+    """
+    st.components.v1.html(js_code, height=0, width=0)
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "user_name" not in st.session_state:
+    st.session_state.user_name = "Inspector"
+
+def login_gate():
     if not st.session_state.authenticated:
-        st.title("🔒 Ocean Lanka Quality System Access")
-        password_input = st.text_input("Enter System Password:", type="password")
-        if st.button("Login"):
-            if password_input == "Ocean2026":  # Default Password
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("❌ Incorrect Password!")
-        return False
+        st.markdown("<h2 style='text-align: center; color: #38BDF8;'>🏭 Ocean Lanka AI Vision System</h2>", unsafe_allow_html=True)
+        st.markdown("<h5 style='text-align: center; color: #94A3B8;'>Enterprise Zero-Hardware Color Identification Suite</h5>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            with st.form("login_form"):
+                user_name_input = st.text_input("👤 Operator Name / User ID:")
+                password_input = st.text_input("🔒 System Password:", type="password")
+                submit_btn = st.form_submit_button("🔐 Authenticate & Launch System", use_container_width=True)
+                
+                if submit_btn:
+                    if password_input == "Ocean2026" and user_name_input.strip() != "":
+                        st.session_state.authenticated = True
+                        st.session_state.user_name = user_name_input.strip()
+                        
+                        # Determine Greeting Time
+                        current_hour = datetime.now().hour
+                        greeting = "Good Morning" if current_hour < 12 else ("Good Afternoon" if current_hour < 17 else "Good Evening")
+                        
+                        welcome_msg = f"{greeting} {st.session_state.user_name}. Welcome to Ocean Lanka Color Identification System. All quality modules are initialized."
+                        speak_voice(welcome_msg)
+                        st.success(f"Welcome, {st.session_state.user_name}!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid Password or User Name missing!")
+            return False
     return True
 
-if not check_password():
+if not login_gate():
     st.stop()
 
-# Initialize Session State Database
 if 'batch_data' not in st.session_state:
-    st.session_state.batch_data = {}  # {batch_no: {customer_lab: (), rolls: {roll_no: [scans]}}}
+    st.session_state.batch_data = {}  
 
-# ==========================================
-# 2. COLOR MATHEMATICS ENGINE (CIEDE2000)
-# ==========================================
 def rgb_to_lab(rgb):
-    """ Converts RGB tuple to CIE L*a*b* """
+    """ Precision RGB to CIE L*a*b* Standard Transformation """
     r, g, b = [x / 255.0 for x in rgb]
     r = ((r + 0.055) / 1.055) ** 2.4 if r > 0.04045 else r / 12.92
     g = ((g + 0.055) / 1.055) ** 2.4 if g > 0.04045 else g / 12.92
@@ -62,225 +116,241 @@ def rgb_to_lab(rgb):
     L = (116 * fy) - 16
     a = 500 * (fx - fy)
     b_val = 200 * (fy - fz)
-    return round(L, 2), round(a, 2), round(b_val, 2)
+    return round(L, 3), round(a, 3), round(b_val, 3)
 
-def calculate_delta_e(lab1, lab2):
-    """ Delta E Calculation (CIEDE2000 Standard) """
-    dL = lab1[0] - lab2[0]
-    da = lab1[1] - lab2[1]
-    db = lab1[2] - lab2[2]
-    c1 = math.sqrt(lab1[1]**2 + lab1[2]**2)
-    c2 = math.sqrt(lab2[1]**2 + lab2[2]**2)
-    dc = c1 - c2
-    dh_sq = da**2 + db**2 - dc**2
-    dh = math.sqrt(max(0, dh_sq))
+def calculate_ciede2000(lab1, lab2):
+    """ High Accuracy CIEDE2000 Delta E Calculation """
+    L1, a1, b1 = lab1
+    L2, a2, b2 = lab2
     
-    sl, sc, sh = 1.0, 1.0 + 0.045 * c1, 1.0 + 0.015 * c1
-    return round(math.sqrt((dL/sl)**2 + (dc/sc)**2 + (dh/sh)**2), 2)
-
-def calculate_roll_grade(avg_customer_de, roll_std_dev):
-    """ Auto Grading System for Fabric Roll """
-    if avg_customer_de <= 0.8 and roll_std_dev <= 0.3:
-        return "Grade A (Premium)", "🟢"
-    elif avg_customer_de <= 1.2 and roll_std_dev <= 0.6:
-        return "Grade B (Acceptable)", "🟡"
+    avg_L = (L1 + L2) / 2.0
+    C1 = math.sqrt(a1**2 + b1**2)
+    C2 = math.sqrt(a2**2 + b2**2)
+    avg_C = (C1 + C2) / 2.0
+    
+    G = 0.5 * (1 - math.sqrt(avg_C**7 / (avg_C**7 + 25**7))) if avg_C > 0 else 0
+    a1_prime = (1 + G) * a1
+    a2_prime = (1 + G) * a2
+    
+    C1_prime = math.sqrt(a1_prime**2 + b1**2)
+    C2_prime = math.sqrt(a2_prime**2 + b2**2)
+    avg_C_prime = (C1_prime + C2_prime) / 2.0
+    
+    h1_prime = math.degrees(math.atan2(b1, a1_prime)) % 360
+    h2_prime = math.degrees(math.atan2(b2, a2_prime)) % 360
+    
+    if abs(h1_prime - h2_prime) <= 180:
+        avg_h_prime = (h1_prime + h2_prime) / 2.0
     else:
-        return "Grade C (Reject/Rework)", "🔴"
+        avg_h_prime = (h1_prime + h2_prime + 360) / 2.0 if (h1_prime + h2_prime) < 360 else (h1_prime + h2_prime - 360) / 2.0
+        
+    T = 1 - 0.17 * math.cos(math.radians(avg_h_prime - 30)) + \
+        0.24 * math.cos(math.radians(2 * avg_h_prime)) + \
+        0.32 * math.cos(math.radians(3 * avg_h_prime + 6)) - \
+        0.20 * math.cos(math.radians(4 * avg_h_prime - 63))
+        
+    delta_h_prime = h2_prime - h1_prime
+    if abs(delta_h_prime) > 180:
+        delta_h_prime -= 360 if h2_prime > h1_prime else -360
+        
+    delta_L_prime = L2 - L1
+    delta_C_prime = C2_prime - C1_prime
+    delta_H_prime = 2 * math.sqrt(C1_prime * C2_prime) * math.sin(math.radians(delta_h_prime / 2.0))
+    
+    S_L = 1 + ((0.015 * ((avg_L - 50)**2)) / math.sqrt(20 + ((avg_L - 50)**2)))
+    S_C = 1 + 0.045 * avg_C_prime
+    S_H = 1 + 0.015 * avg_C_prime * T
+    
+    delta_ro = 30 * math.exp(-(((avg_h_prime - 275) / 25)**2))
+    R_C = 2 * math.sqrt(avg_C_prime**7 / (avg_C_prime**7 + 25**7))
+    R_T = -math.sin(math.radians(2 * delta_ro)) * R_C
+    
+    de2000 = math.sqrt(
+        (delta_L_prime / S_L)**2 +
+        (delta_C_prime / S_C)**2 +
+        (delta_H_prime / S_H)**2 +
+        R_T * (delta_C_prime / S_C) * (delta_H_prime / S_H)
+    )
+    return round(de2000, 3)
 
-# ==========================================
-# 3. HEADER & SIDEBAR CONTROLS
-# ==========================================
-st.title("🏭 Ocean Lanka - Digital Color Variation Identifier")
-st.caption("AI-Driven Industrial Quality Control System | Zero-Hardware Fabric Inspection")
+def get_quality_grade(avg_de, max_de):
+    """ Enterprise Grade Categorization """
+    if avg_de <= 0.75 and max_de <= 1.0:
+        return "Grade A (Premium Pass)", "status-badge-a", "🟢"
+    elif avg_de <= 1.20 and max_de <= 1.5:
+        return "Grade B (Standard Pass)", "status-badge-b", "🟡"
+    else:
+        return "Grade C (Reject / Out of Spec)", "status-badge-c", "🔴"
 
-st.sidebar.header("📋 Batch & Roll Management")
+h_col1, h_col2 = st.columns([3, 1])
+with h_col1:
+    st.title("🎨 Ocean Lanka - AI Precision Color Identifier")
+    st.caption(f"👤 Authenticated Inspector: **{st.session_state.user_name}** | Autonomous Vision System")
 
-# Batch Management
-batch_no = st.sidebar.text_input("Enter Batch Number:", value="BATCH-9001").upper()
+with h_col2:
+    now_str = datetime.now().strftime("%Y-%m-%d | %I:%M %p")
+    st.markdown(f"<br><div class='realtime-clock'>⏱️ {now_str}</div>", unsafe_allow_html=True)
 
-# Default Lab ERP Database Simulation
-erp_database = {
-    "BATCH-9001": (45.2, 12.1, -8.5),
-    "BATCH-9002": (58.0, -5.4, 22.1)
-}
+st.markdown("---")
 
-# Customer Target L*a*b* Setup
-st.sidebar.subheader("🎯 Customer Requirement L*a*b*")
-if batch_no in erp_database:
-    default_lab = erp_database[batch_no]
-    st.sidebar.success(f"Loaded Target from ERP for {batch_no}")
-else:
-    st.sidebar.warning("Batch not in ERP. Enter Target Manually:")
-    default_lab = (50.0, 0.0, 0.0)
+st.sidebar.markdown("### ⚙️ Control Panel")
+nav_choice = st.sidebar.radio("Navigation Module:", ["🔍 Real-time Inspection", "📊 Batch Quality Analytics", "📜 Executive PDF Reporting"])
 
-c_L = st.sidebar.number_input("Target L* (Lightness)", value=default_lab[0])
-c_a = st.sidebar.number_input("Target a* (Red/Green)", value=default_lab[1])
-c_b = st.sidebar.number_input("Target b* (Yellow/Blue)", value=default_lab[2])
-customer_target_lab = (c_L, c_a, c_b)
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📦 Active Production Context")
+batch_no = st.sidebar.text_input("Batch Number:", value="BATCH-9001").upper()
+roll_no = st.sidebar.text_input("Roll Number:", value="ROLL-01").upper()
 
-# Store Batch Metadata
 if batch_no not in st.session_state.batch_data:
-    st.session_state.batch_data[batch_no] = {
-        "customer_lab": customer_target_lab,
-        "rolls": {}
-    }
-
-# Roll Selection
-roll_no = st.sidebar.text_input("Enter Roll Number:", value="ROLL-01").upper()
+    st.session_state.batch_data[batch_no] = {"rolls": {}}
 if roll_no not in st.session_state.batch_data[batch_no]["rolls"]:
     st.session_state.batch_data[batch_no]["rolls"][roll_no] = []
 
-# ==========================================
-# 4. DIRECT PHONE CAMERA CAPTURE MODULE
-# ==========================================
-st.subheader(f"🔍 Inspection Point: {batch_no} ➔ {roll_no}")
+if st.sidebar.button("🚪 Logout User"):
+    st.session_state.authenticated = False
+    st.rerun()
 
-col_cam, col_ctrl = st.columns([2, 1])
-
-with col_ctrl:
-    st.markdown("### 📷 Scan Method")
-    cam_source = st.radio("Select Source:", ["Direct Phone Camera", "Upload Saved Photo"])
+if nav_choice == "🔍 Real-time Inspection":
+    st.subheader(f"📍 Active Scan Point: Batch [{batch_no}] ➔ Roll [{roll_no}]")
     
-    # Custom or Preset Scan Positions
-    position_type = st.radio("Position Input Type:", ["Preset Position", "Custom Position (Meter)"])
-    if position_type == "Preset Position":
-        position = st.selectbox("Roll Scan Position:", ["Start (0m)", "Middle (50m)", "End (100m)", "Edge-Left", "Center", "Edge-Right"])
-    else:
-        position = st.text_input("Type Custom Position (e.g., 25m / Center-Point):", value="15m")
-
-with col_cam:
-    captured_img = None
-
-    if cam_source == "Direct Phone Camera":
-        # Native Phone Camera Capture Input
-        camera_photo = st.camera_input("Take a photo of the fabric surface")
-        if camera_photo is not None:
-            image = Image.open(camera_photo)
-            captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-    else:
-        uploaded_file = st.file_uploader("Upload Fabric Image File", type=['jpg', 'png', 'jpeg'])
-        if uploaded_file is not None:
-            image = Image.open(uploaded_file)
-            captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-
-    if captured_img is not None:
-        # Convert BGR to RGB for Display & Color Processing
-        img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
+    col_cam, col_controls = st.columns([2, 1])
+    
+    with col_controls:
+        st.markdown("#### 📷 Input Method")
+        cam_source = st.radio("Select Source:", ["Direct Phone Camera", "Upload Image File"])
+        position = st.selectbox("Scan Position:", ["Start (0m)", "Middle (50m)", "End (100m)", "Edge-Left", "Center-Point", "Edge-Right", "Custom Meter Point"])
         
-        # Extract Mean Color from Center ROI (Region of Interest)
-        h, w, _ = img_rgb.shape
-        roi = img_rgb[int(h*0.3):int(h*0.7), int(w*0.3):int(w*0.7)]
-        mean_rgb = cv2.mean(roi)[:3]
-        current_lab = rgb_to_lab(mean_rgb)
+        if position == "Custom Meter Point":
+            position = st.text_input("Type Distance (e.g., 25m):", value="25m")
+            
+    with col_cam:
+        captured_img = None
+        if cam_source == "Direct Phone Camera":
+            photo = st.camera_input("Take a photo of fabric surface")
+            if photo:
+                image = Image.open(photo)
+                captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        else:
+            file_up = st.file_uploader("Select Fabric Image", type=['jpg', 'jpeg', 'png'])
+            if file_up:
+                image = Image.open(file_up)
+                captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                
+        if captured_img is not None:
+            img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
+            h, w, _ = img_rgb.shape
+            roi = img_rgb[int(h*0.35):int(h*0.65), int(w*0.35):int(w*0.65)]
+            mean_rgb = cv2.mean(roi)[:3]
+            current_lab = rgb_to_lab(mean_rgb)
+            
+            st.image(img_rgb, caption=f"Captured Surface - {position}", use_container_width=True)
+            st.info(f"📊 Extracted CIELAB Parameters: L*={current_lab[0]}, a*={current_lab[1]}, b*={current_lab[2]}")
+            
+            if st.button("💾 Save Scan Point", use_container_width=True):
+                scan_data = {
+                    "position": position,
+                    "lab": current_lab,
+                    "rgb": mean_rgb,
+                    "time": datetime.now().strftime("%H:%M:%S")
+                }
+                st.session_state.batch_data[batch_no]["rolls"][roll_no].append(scan_data)
+                
+                scan_count = len(st.session_state.batch_data[batch_no]["rolls"][roll_no])
+                speak_voice(f"Scan point saved at {position}. Total points for roll {roll_no} is now {scan_count}.")
+                st.success(f"✅ Position [{position}] recorded successfully!")
+                time.sleep(1)
+                st.rerun()
 
-        st.info(f"📍 Calculated Sample L*a*b*: {current_lab}")
+    current_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
+    if len(current_scans) > 0:
+        st.markdown("---")
+        st.subheader(f"📈 Real-time Roll Variation Analysis ({roll_no})")
+        
+        df_roll = pd.DataFrame(current_scans)
+        base_lab = df_roll.iloc[0]["lab"]  
+        
+        df_roll["Delta_E_Base"] = df_roll["lab"].apply(lambda x: calculate_ciede2000(base_lab, x))
+        
+        avg_de = df_roll["Delta_E_Base"].mean()
+        max_de = df_roll["Delta_E_Base"].max()
+        std_de = df_roll["Delta_E_Base"].std() if len(df_roll) > 1 else 0.0
+        grade_text, badge_class, icon = get_quality_grade(avg_de, max_de)
+        
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Average ΔE2000", f"{avg_de:.3f}")
+        m2.metric("Max Variation", f"{max_de:.3f}")
+        m3.metric("Standard Deviation (σ)", f"{std_de:.3f}")
+        m4.markdown(f"**Roll Quality Grade**<br><span class='{badge_class}'>{icon} {grade_text}</span>", unsafe_allow_html=True)
+        
+        fig = px.line(df_roll, x="position", y="Delta_E_Base", markers=True,
+                      title=f"Color Variation Profile Across Roll ({roll_no})",
+                      labels={"Delta_E_Base": "CIEDE2000 (ΔE)", "position": "Position"},
+                      template="plotly_dark")
+        fig.add_hline(y=0.75, line_dash="dash", line_color="#EAB308", annotation_text="Warning Threshold (0.75)")
+        fig.add_hline(y=1.20, line_dash="dash", line_color="#EF4444", annotation_text="Tolerance Limit (1.20)")
+        st.plotly_chart(fig, use_container_width=True)
 
-        # Data Saving Button
-        if st.button("💾 Save Point Analysis", use_container_width=True):
-            scan_entry = {
-                "position": position,
-                "lab": current_lab,
-                "rgb": mean_rgb
-            }
-            st.session_state.batch_data[batch_no]["rolls"][roll_no].append(scan_entry)
-            st.success(f"✅ Saved Analysis for Position: {position}")
-            st.rerun()
-
-# ==========================================
-# 5. ROLL & BATCH ANALYTICS ENGINE
-# ==========================================
-roll_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
-
-if len(roll_scans) > 0:
-    st.markdown("---")
-    st.subheader(f"📊 Real-time Analytics Dashboard for {roll_no}")
-
-    # Build Dataframe for Current Roll Scans
-    roll_df = pd.DataFrame(roll_scans)
+elif nav_choice == "📊 Batch Quality Analytics":
+    st.subheader(f"📦 Overall Batch Color Uniformity Dashboard [{batch_no}]")
     
-    # Calculate Delta E Values
-    # 1. Delta E vs Customer Requirement
-    roll_df["DE_Customer"] = roll_df["lab"].apply(lambda x: calculate_delta_e(customer_target_lab, x))
+    all_rolls = st.session_state.batch_data[batch_no]["rolls"]
+    batch_records = []
     
-    # 2. Delta E vs First Scan of Roll (Roll Self Differential)
-    base_roll_lab = roll_scans[0]["lab"]
-    roll_df["DE_Roll_Differential"] = roll_df["lab"].apply(lambda x: calculate_delta_e(base_roll_lab, x))
+    for r_id, scans in all_rolls.items():
+        if len(scans) > 0:
+            first_lab = scans[0]["lab"]
+            for s in scans:
+                de_val = calculate_ciede2000(first_lab, s["lab"])
+                batch_records.append({
+                    "Roll Number": r_id,
+                    "Position": s["position"],
+                    "L*": s["lab"][0], "a*": s["lab"][1], "b*": s["lab"][2],
+                    "Delta E": de_val
+                })
+                
+    if len(batch_records) > 0:
+        df_batch = pd.DataFrame(batch_records)
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            fig_box = px.box(df_batch, x="Roll Number", y="Delta E", color="Roll Number",
+                             title="Batch Delta E Dispersion Across Rolls", template="plotly_dark")
+            st.plotly_chart(fig_box, use_container_width=True)
+            
+        with c2:
+            fig_bar = px.bar(df_batch, x="Position", y="Delta E", color="Roll Number", barmode="group",
+                             title="Position-wise Delta E Comparison", template="plotly_dark")
+            st.plotly_chart(fig_bar, use_container_width=True)
+            
+        st.markdown("### 📋 Tabular Batch Quality Records")
+        st.dataframe(df_batch, use_container_width=True)
+    else:
+        st.warning("No inspection records found for this batch. Scan points in Module 1 first.")
 
-    # Metrics Summary Display
-    m1, m2, m3, m4 = st.columns(4)
-    avg_de_cust = round(roll_df["DE_Customer"].mean(), 2)
-    std_dev_roll = round(roll_df["DE_Roll_Differential"].std(), 2) if len(roll_df) > 1 else 0.0
-    grade, badge = calculate_roll_grade(avg_de_cust, std_dev_roll)
-
-    m1.metric("Avg ΔE (vs Customer Target)", avg_de_cust)
-    m2.metric("Roll Internal Variation (StdDev)", std_dev_roll)
-    m3.metric("Max Variation Range", round(roll_df["DE_Roll_Differential"].max(), 2))
-    m4.metric("Roll Quality Grade", f"{badge} {grade}")
-
-    # LINE CHARTS FOR TWO COMPARISONS
-    c1, c2 = st.columns(2)
-
-    with c1:
-        st.markdown("##### 📈 1. Roll-wise Color Differential (Internal Stability)")
-        fig1 = px.line(roll_df, x="position", y="DE_Roll_Differential", markers=True,
-                       title="Internal Color Variation Across Roll Length/Width",
-                       labels={"DE_Roll_Differential": "Delta E (vs Roll Start)", "position": "Position"})
-        fig1.add_hline(y=0.8, line_dash="dash", line_color="orange", annotation_text="Warning Limit (0.8)")
-        st.plotly_chart(fig1, use_container_width=True)
-
-    with c2:
-        st.markdown("##### 📈 2. Roll Color vs Customer Requirement")
-        fig2 = px.line(roll_df, x="position", y="DE_Customer", markers=True,
-                       title="Deviation from Customer Master Standard",
-                       labels={"DE_Customer": "Delta E (vs Customer Standard)", "position": "Position"})
-        fig2.add_hline(y=1.0, line_dash="dash", line_color="red", annotation_text="Customer Limit (1.0)")
-        st.plotly_chart(fig2, use_container_width=True)
-
-# ==========================================
-# 6. OVERALL BATCH LEVEL ANALYTICS & DOWNLOAD
-# ==========================================
-st.markdown("---")
-st.subheader(f"📦 Overall Quality Summary for Batch: {batch_no}")
-
-all_rolls = st.session_state.batch_data[batch_no]["rolls"]
-batch_records = []
-
-for r_id, scans in all_rolls.items():
-    for s in scans:
-        de_c = calculate_delta_e(customer_target_lab, s["lab"])
-        batch_records.append({
-            "Roll Number": r_id,
-            "Position": s["position"],
-            "L*": s["lab"][0], "a*": s["lab"][1], "b*": s["lab"][2],
-            "Delta E (Customer)": de_c
-        })
-
-if len(batch_records) > 0:
-    batch_df = pd.DataFrame(batch_records)
+elif nav_choice == "📜 Executive PDF Reporting":
+    st.subheader(f"📄 Automatic Report Generation [{batch_no}]")
     
-    # Batch Comparison Chart
-    fig_batch = px.box(batch_df, x="Roll Number", y="Delta E (Customer)", color="Roll Number",
-                       title="Batch Color Variation Spread Across All Scanned Rolls")
-    st.plotly_chart(fig_batch, use_container_width=True)
-
-    # Data Export Engine
-    st.markdown("### 📥 Download Inspection Reports")
+    all_rolls = st.session_state.batch_data[batch_no]["rolls"]
+    total_scans = sum([len(scans) for scans in all_rolls.values()])
     
-    csv_data = batch_df.to_csv(index=False).encode('utf-8')
-    
-    d1, d2 = st.columns(2)
-    d1.download_button(
-        label="📄 Download Current Roll Inspection CSV",
-        data=csv_data,
-        file_name=f"{batch_no}_{roll_no}_Inspection.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-    
-    d2.download_button(
-        label="📦 Download Complete Batch Executive Summary CSV",
-        data=csv_data,
-        file_name=f"Full_{batch_no}_Quality_Report.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
+    if total_scans > 0:
+        st.success(f"System ready to compile reports for {len(all_rolls)} rolls and {total_scans} total inspection points.")
+        
+        csv_list = []
+        for r_id, scans in all_rolls.items():
+            for s in scans:
+                csv_list.append({"Batch": batch_no, "Roll": r_id, "Position": s["position"], "L*": s["lab"][0], "a*": s["lab"][1], "b*": s["lab"][2]})
+        df_csv = pd.DataFrame(csv_list)
+        csv_bytes = df_csv.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(
+            label="📥 Download Complete Executive Batch Summary (CSV)",
+            data=csv_bytes,
+            file_name=f"OceanLanka_{batch_no}_Quality_Report.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+        speak_voice(f"Quality batch analysis complete for batch {batch_no}. Executive report is ready for export.")
+    else:
+        st.warning("Insufficient data to generate reports.")
