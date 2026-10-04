@@ -9,6 +9,8 @@ import math
 import io
 import time
 from datetime import datetime
+import mysql.connector
+
 
 st.set_page_config(
     page_title="Ocean Lanka - AI Color Precision Suite",
@@ -16,6 +18,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 
 st.markdown("""
 <style>
@@ -32,18 +35,47 @@ st.markdown("""
     .status-badge-a { background-color: #059669; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
     .status-badge-b { background-color: #D97706; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
     .status-badge-c { background-color: #DC2626; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
-    .realtime-clock {
-        font-size: 14px;
-        font-weight: 600;
-        color: #38BDF8;
-        background: #1E293B;
-        padding: 6px 12px;
-        border-radius: 8px;
-        border: 1px solid #0EA5E9;
-        display: inline-block;
-    }
 </style>
 """, unsafe_allow_html=True)
+
+
+def get_db_connection():
+    """ Establish Connection to MySQL Database """
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",         
+            user="root",             
+            password="", 
+            database="ocean_quality_db",
+            port=3306
+        )
+        return conn
+    except Exception as e:
+        st.error(f"❌ Database Connection Error: {e}")
+        return None
+
+def save_scan_to_mysql(inspector, batch, roll, pos, lab, delta_e):
+    """ Inserts Inspection Data directly into MySQL Table """
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            query = """
+            INSERT INTO color_inspections 
+            (inspector_name, batch_no, roll_no, scan_position, lab_L, lab_a, lab_b, ciede2000_delta_e) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            values = (inspector, batch, roll, pos, lab[0], lab[1], lab[2], delta_e)
+            cursor.execute(query, values)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            st.error(f"❌ Database Insertion Failed: {e}")
+            return False
+    return False
+
 
 def speak_voice(text):
     """ Synthesizes Speech via Browser Speech API """
@@ -56,6 +88,7 @@ def speak_voice(text):
     </script>
     """
     st.components.v1.html(js_code, height=0, width=0)
+
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -95,8 +128,10 @@ def login_gate():
 if not login_gate():
     st.stop()
 
+# Initialize Batch Session State Data Structure
 if 'batch_data' not in st.session_state:
-    st.session_state.batch_data = {}  
+    st.session_state.batch_data = {}  # {batch_no: {rolls: {roll_no: [scans]}}}
+
 
 def rgb_to_lab(rgb):
     """ Precision RGB to CIE L*a*b* Standard Transformation """
@@ -182,33 +217,55 @@ def get_quality_grade(avg_de, max_de):
     else:
         return "Grade C (Reject / Out of Spec)", "status-badge-c", "🔴"
 
-h_col1, h_col2 = st.columns([3, 1])
+
+h_col1, h_col2 = st.columns([2.5, 1.5])
+
 with h_col1:
     st.title("🎨 Ocean Lanka - AI Precision Color Identifier")
     st.caption(f"👤 Authenticated Inspector: **{st.session_state.user_name}** | Autonomous Vision System")
 
 with h_col2:
-    now_str = datetime.now().strftime("%Y-%m-%d | %I:%M %p")
-    st.markdown(f"<br><div class='realtime-clock'>⏱️ {now_str}</div>", unsafe_allow_html=True)
+    # JavaScript Real-Time Dynamic Clock Component (Sri Lanka Time Zone)
+    clock_html = """
+    <div style="background: #1E293B; padding: 10px 15px; border-radius: 10px; border: 1px solid #0EA5E9; text-align: center;">
+        <span style="font-size: 12px; color: #94A3B8; font-weight: bold;">🇱🇰 SRI LANKA REAL-TIME</span><br>
+        <span id="live_clock" style="font-size: 16px; font-weight: bold; color: #38BDF8;">--:--:--</span>
+    </div>
+    <script>
+        function updateClock() {
+            var now = new Date();
+            var options = { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            var formatter = new Intl.DateTimeFormat('en-US', options);
+            document.getElementById('live_clock').innerHTML = formatter.format(now);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+    """
+    st.components.v1.html(clock_html, height=80)
 
 st.markdown("---")
 
+
 st.sidebar.markdown("### ⚙️ Control Panel")
-nav_choice = st.sidebar.radio("Navigation Module:", ["🔍 Real-time Inspection", "📊 Batch Quality Analytics", "📜 Executive PDF Reporting"])
+nav_choice = st.sidebar.radio("Navigation Module:", ["🔍 Real-time Inspection", "📊 Batch Quality Analytics", "📜 Live MySQL Database Records"])
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📦 Active Production Context")
 batch_no = st.sidebar.text_input("Batch Number:", value="BATCH-9001").upper()
 roll_no = st.sidebar.text_input("Roll Number:", value="ROLL-01").upper()
 
+
 if batch_no not in st.session_state.batch_data:
     st.session_state.batch_data[batch_no] = {"rolls": {}}
 if roll_no not in st.session_state.batch_data[batch_no]["rolls"]:
     st.session_state.batch_data[batch_no]["rolls"][roll_no] = []
 
+
 if st.sidebar.button("🚪 Logout User"):
     st.session_state.authenticated = False
     st.rerun()
+
 
 if nav_choice == "🔍 Real-time Inspection":
     st.subheader(f"📍 Active Scan Point: Batch [{batch_no}] ➔ Roll [{roll_no}]")
@@ -246,7 +303,22 @@ if nav_choice == "🔍 Real-time Inspection":
             st.image(img_rgb, caption=f"Captured Surface - {position}", use_container_width=True)
             st.info(f"📊 Extracted CIELAB Parameters: L*={current_lab[0]}, a*={current_lab[1]}, b*={current_lab[2]}")
             
-            if st.button("💾 Save Scan Point", use_container_width=True):
+            if st.button("💾 Save Scan Point to MySQL", use_container_width=True):
+                current_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
+                base_lab = current_scans[0]["lab"] if len(current_scans) > 0 else current_lab
+                delta_e_calc = calculate_ciede2000(base_lab, current_lab)
+
+                
+                db_success = save_scan_to_mysql(
+                    st.session_state.user_name,
+                    batch_no,
+                    roll_no,
+                    position,
+                    current_lab,
+                    delta_e_calc
+                )
+                
+                
                 scan_data = {
                     "position": position,
                     "lab": current_lab,
@@ -255,19 +327,21 @@ if nav_choice == "🔍 Real-time Inspection":
                 }
                 st.session_state.batch_data[batch_no]["rolls"][roll_no].append(scan_data)
                 
-                scan_count = len(st.session_state.batch_data[batch_no]["rolls"][roll_no])
-                speak_voice(f"Scan point saved at {position}. Total points for roll {roll_no} is now {scan_count}.")
-                st.success(f"✅ Position [{position}] recorded successfully!")
-                time.sleep(1)
-                st.rerun()
+                if db_success:
+                    scan_count = len(st.session_state.batch_data[batch_no]["rolls"][roll_no])
+                    speak_voice(f"Scan point saved to database for position {position}.")
+                    st.success(f"✅ Position [{position}] saved directly to MySQL Database!")
+                    time.sleep(1)
+                    st.rerun()
 
+    
     current_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
     if len(current_scans) > 0:
         st.markdown("---")
         st.subheader(f"📈 Real-time Roll Variation Analysis ({roll_no})")
         
         df_roll = pd.DataFrame(current_scans)
-        base_lab = df_roll.iloc[0]["lab"]  
+        base_lab = df_roll.iloc[0]["lab"]  # Roll Reference Base
         
         df_roll["Delta_E_Base"] = df_roll["lab"].apply(lambda x: calculate_ciede2000(base_lab, x))
         
@@ -282,6 +356,7 @@ if nav_choice == "🔍 Real-time Inspection":
         m3.metric("Standard Deviation (σ)", f"{std_de:.3f}")
         m4.markdown(f"**Roll Quality Grade**<br><span class='{badge_class}'>{icon} {grade_text}</span>", unsafe_allow_html=True)
         
+        
         fig = px.line(df_roll, x="position", y="Delta_E_Base", markers=True,
                       title=f"Color Variation Profile Across Roll ({roll_no})",
                       labels={"Delta_E_Base": "CIEDE2000 (ΔE)", "position": "Position"},
@@ -289,6 +364,7 @@ if nav_choice == "🔍 Real-time Inspection":
         fig.add_hline(y=0.75, line_dash="dash", line_color="#EAB308", annotation_text="Warning Threshold (0.75)")
         fig.add_hline(y=1.20, line_dash="dash", line_color="#EF4444", annotation_text="Tolerance Limit (1.20)")
         st.plotly_chart(fig, use_container_width=True)
+
 
 elif nav_choice == "📊 Batch Quality Analytics":
     st.subheader(f"📦 Overall Batch Color Uniformity Dashboard [{batch_no}]")
@@ -327,30 +403,21 @@ elif nav_choice == "📊 Batch Quality Analytics":
     else:
         st.warning("No inspection records found for this batch. Scan points in Module 1 first.")
 
-elif nav_choice == "📜 Executive PDF Reporting":
-    st.subheader(f"📄 Automatic Report Generation [{batch_no}]")
+
+elif nav_choice == "📜 Live MySQL Database Records":
+    st.subheader(f"📄 Live MySQL Inspection Records [{batch_no}]")
     
-    all_rolls = st.session_state.batch_data[batch_no]["rolls"]
-    total_scans = sum([len(scans) for scans in all_rolls.values()])
-    
-    if total_scans > 0:
-        st.success(f"System ready to compile reports for {len(all_rolls)} rolls and {total_scans} total inspection points.")
-        
-        csv_list = []
-        for r_id, scans in all_rolls.items():
-            for s in scans:
-                csv_list.append({"Batch": batch_no, "Roll": r_id, "Position": s["position"], "L*": s["lab"][0], "a*": s["lab"][1], "b*": s["lab"][2]})
-        df_csv = pd.DataFrame(csv_list)
-        csv_bytes = df_csv.to_csv(index=False).encode('utf-8')
-        
-        st.download_button(
-            label="📥 Download Complete Executive Batch Summary (CSV)",
-            data=csv_bytes,
-            file_name=f"OceanLanka_{batch_no}_Quality_Report.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-        
-        speak_voice(f"Quality batch analysis complete for batch {batch_no}. Executive report is ready for export.")
-    else:
-        st.warning("Insufficient data to generate reports.")
+    conn = get_db_connection()
+    if conn:
+        try:
+            query = "SELECT * FROM color_inspections WHERE batch_no = %s ORDER BY scan_timestamp DESC"
+            df_db = pd.read_sql(query, conn, params=[batch_no])
+            conn.close()
+            
+            if not df_db.empty:
+                st.success(f"📊 Loaded {len(df_db)} records directly from MySQL Database.")
+                st.dataframe(df_db, use_container_width=True)
+            else:
+                st.warning("No records found in MySQL Database for this Batch Number.")
+        except Exception as e:
+            st.error(f"❌ Failed to fetch data from Database: {e}")
