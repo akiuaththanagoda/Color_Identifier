@@ -13,7 +13,6 @@ from PIL import Image
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- Page Configuration ---
 st.set_page_config(
     page_title="Ocean Lanka - AI Color Precision Suite",
     page_icon="🎨",
@@ -21,7 +20,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- Custom Styling ---
 st.markdown(
     """
 <style>
@@ -43,8 +41,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-# --- MySQL Database Helpers ---
 def get_db_connection():
   """Establish Connection to MySQL Database"""
   try:
@@ -83,8 +79,6 @@ def save_scan_to_mysql(inspector, batch, roll, pos, lab, delta_e):
       return False
   return False
 
-
-# --- Voice Output Helper ---
 def speak_voice(text):
   """Synthesizes Speech via Browser Speech API"""
   js_code = f"""
@@ -97,8 +91,6 @@ def speak_voice(text):
     """
   components.html(js_code, height=0, width=0)
 
-
-# --- Session State & Authentication Gate ---
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 if "user_name" not in st.session_state:
@@ -159,12 +151,9 @@ def login_gate():
 if not login_gate():
   st.stop()
 
-# Initialize Batch Session State Data Structure
 if "batch_data" not in st.session_state:
   st.session_state.batch_data = {}
 
-
-# --- Color Precision Math ---
 def rgb_to_lab(rgb):
   """Precision RGB to CIE L*a*b* Standard Transformation"""
   r, g, b = [x / 255.0 for x in rgb]
@@ -184,7 +173,6 @@ def rgb_to_lab(rgb):
   a = 500 * (fx - fy)
   b_val = 200 * (fy - fz)
   return round(L, 3), round(a, 3), round(b_val, 3)
-
 
 def calculate_ciede2000(lab1, lab2):
   """High Accuracy CIEDE2000 Delta E Calculation"""
@@ -265,7 +253,6 @@ def get_quality_grade(avg_de, max_de):
     return "Grade C (Reject / Out of Spec)", "status-badge-c", "🔴"
 
 
-# --- Header & Live Clock ---
 h_col1, h_col2 = st.columns([2.5, 1.5])
 
 with h_col1:
@@ -296,7 +283,6 @@ with h_col2:
 
 st.markdown("---")
 
-# --- Sidebar Controls ---
 st.sidebar.markdown("### ⚙️ Control Panel")
 nav_choice = st.sidebar.radio(
     "Navigation Module:",
@@ -321,7 +307,7 @@ if st.sidebar.button("🚪 Logout User"):
   st.session_state.authenticated = False
   st.rerun()
 
-# --- Module 1: Real-Time Inspection ---
+
 if nav_choice == "🔍 Real-time Inspection":
   st.subheader(f"📍 Active Scan Point: Batch [{batch_no}] ➔ Roll [{roll_no}]")
 
@@ -331,11 +317,7 @@ if nav_choice == "🔍 Real-time Inspection":
     st.markdown("#### 📷 Input Method")
     cam_source = st.radio(
         "Select Source:",
-        [
-            "Direct Mobile Camera (Flash/HD)",
-            "Standard Camera Input",
-            "Upload Image File",
-        ],
+        ["Mobile / Standard Camera Input", "Upload Image File"],
     )
     position = st.selectbox(
         "Scan Position:",
@@ -365,84 +347,17 @@ if nav_choice == "🔍 Real-time Inspection":
   with col_cam:
     captured_img = None
 
-    if cam_source == "Direct Mobile Camera (Flash/HD)":
-      # HTML5 / JS Camera Component with High Res & Flash Control
-      camera_html = """
-            <div style="text-align: center; font-family: Arial, sans-serif;">
-                <video id="video" autoplay playsinline style="width: 100%; max-width: 500px; border-radius: 10px; border: 2px solid #0EA5E9;"></video>
-                <br><br>
-                <button id="flashBtn" onclick="toggleFlash()" style="padding: 10px 18px; font-size: 15px; margin-right: 10px; border-radius: 8px; background-color: #EAB308; color: black; font-weight: bold; border: none; cursor: pointer;">💡 Toggle Flash</button>
-                <button id="captureBtn" onclick="takeSnapshot()" style="padding: 10px 18px; font-size: 15px; border-radius: 8px; background-color: #10B981; color: white; font-weight: bold; border: none; cursor: pointer;">📸 Capture Photo</button>
-                <canvas id="canvas" style="display:none;"></canvas>
-            </div>
-
-            <script>
-            let videoStream = null;
-            let track = null;
-            let flashOn = false;
-
-            const constraints = {
-                video: {
-                    facingMode: { ideal: "environment" },
-                    width: { ideal: 3840, max: 3840 },
-                    height: { ideal: 2160, max: 2160 }
-                }
-            };
-
-            async function startCamera() {
-                try {
-                    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    const video = document.getElementById('video');
-                    video.srcObject = videoStream;
-                    track = videoStream.getVideoTracks()[0];
-                } catch (err) {
-                    console.error("Camera access error:", err);
-                }
-            }
-
-            async function toggleFlash() {
-                if (!track) return;
-                const capabilities = track.getCapabilities();
-                if (capabilities.torch) {
-                    flashOn = !flashOn;
-                    await track.applyConstraints({
-                        advanced: [{ torch: flashOn }]
-                    });
-                } else {
-                    alert("Torch/Flash is not supported on this camera/browser.");
-                }
-            }
-
-            function takeSnapshot() {
-                const video = document.getElementById('video');
-                const canvas = document.getElementById('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                window.parent.postMessage({type: "streamlit:setComponentValue", value: dataUrl}, "*");
-            }
-
-            startCamera();
-            </script>
-            """
-      image_data = components.html(camera_html, height=430)
-
-      # Safe Type Checking to prevent split() error on non-string component values
-      if isinstance(image_data, str) and "," in image_data:
-        header, encoded = image_data.split(",", 1)
-        img_bytes = base64.b64decode(encoded)
-        np_arr = np.frombuffer(img_bytes, np.uint8)
-        captured_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-    elif cam_source == "Standard Camera Input":
-      photo = st.camera_input("Take a photo of fabric surface")
+    if cam_source == "Mobile / Standard Camera Input":
+      st.info(
+          "💡 Tip: On mobile devices, clicking below will open your camera app"
+          " with full autofocus and flash support."
+      )
+      photo = st.camera_input(
+          "📸 Capture Fabric Surface (Click 'Take Photo')"
+      )
       if photo:
         image = Image.open(photo)
         captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-
     else:
       file_up = st.file_uploader(
           "Select Fabric Image", type=["jpg", "jpeg", "png"]
@@ -566,8 +481,6 @@ if nav_choice == "🔍 Real-time Inspection":
     )
     st.plotly_chart(fig, use_container_width=True)
 
-
-# --- Module 2: Batch Analytics ---
 elif nav_choice == "📊 Batch Quality Analytics":
   st.subheader(f"📦 Overall Batch Color Uniformity Dashboard [{batch_no}]")
 
@@ -623,8 +536,6 @@ elif nav_choice == "📊 Batch Quality Analytics":
         " first."
     )
 
-
-# --- Module 3: Live Database Records ---
 elif nav_choice == "📜 Live MySQL Database Records":
   st.subheader(f"📄 Live MySQL Inspection Records [{batch_no}]")
 
