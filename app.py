@@ -430,7 +430,8 @@ if nav_choice == "🔍 Real-time Inspection":
             """
       image_data = components.html(camera_html, height=430)
 
-      if image_data:
+      # Safe Type Checking to prevent split() error on non-string component values
+      if isinstance(image_data, str) and "," in image_data:
         header, encoded = image_data.split(",", 1)
         img_bytes = base64.b64decode(encoded)
         np_arr = np.frombuffer(img_bytes, np.uint8)
