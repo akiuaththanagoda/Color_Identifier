@@ -85,6 +85,8 @@ if "user_name" not in st.session_state:
   st.session_state.user_name = "Inspector"
 if "batch_data" not in st.session_state:
   st.session_state.batch_data = {}
+if "last_img_hash" not in st.session_state:
+  st.session_state.last_img_hash = None
 
 # --- Login Gate ---
 if not st.session_state.authenticated:
@@ -103,7 +105,7 @@ if not st.session_state.authenticated:
           st.session_state.authenticated = True
           st.session_state.user_name = user_in.strip()
           speak_voice("System initialized. Welcome " + user_in)
-          time.sleep(2)  # Allow voice to finish before rerun
+          time.sleep(2)
           st.rerun()
         else:
           st.error("Invalid credentials!")
@@ -283,15 +285,23 @@ if nav_choice == "🔍 Real-time Inspection":
     # --- PRIMARY METRIC DISPLAY (ΔE2000 Focus) ---
     de_val = metrics["de"]
     is_pass = de_val <= 1.0
-    status_text = "PASS (Within Spec)" if is_pass else "FAIL (Out of Spec)"
+    status_text = "PASS" if is_pass else "FAIL"
     status_color = "#059669" if is_pass else "#DC2626"
+
+    # Automatically speak out the Delta E prediction result for each new scan
+    img_hash = hash(captured_img.tobytes())
+    if st.session_state.last_img_hash != img_hash:
+      speak_voice(
+          f"Delta E value is {de_val}. Inspection result is {status_text}."
+      )
+      st.session_state.last_img_hash = img_hash
 
     st.markdown(
         f"""
         <div style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border: 2px solid {status_color}; padding: 18px; border-radius: 14px; text-align: center; margin-top: 15px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
             <div style="font-size: 12px; color: #94A3B8; font-weight: bold; letter-spacing: 1.5px;">PRIMARY COLOR METRIC</div>
             <div style="font-size: 40px; font-weight: bold; color: #F8FAFC; margin: 5px 0;">ΔE2000 = {de_val}</div>
-            <span style="background-color: {status_color}; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;">{status_text}</span>
+            <span style="background-color: {status_color}; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;">{status_text} ({"Within Spec" if is_pass else "Out of Spec"})</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -320,7 +330,7 @@ if nav_choice == "🔍 Real-time Inspection":
       )
       if success:
         speak_voice("Scan saved successfully to database.")
-        time.sleep(2)  # Allow voice to finish before rerun
+        time.sleep(2)
         st.success("✅ Saved successfully to Database!")
         time.sleep(0.5)
         st.rerun()
