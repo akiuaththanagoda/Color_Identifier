@@ -11,6 +11,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 import streamlit as st
+import streamlit.components.v1 as components
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -26,13 +27,6 @@ st.markdown(
 <style>
     .main { background-color: #0B0F19; color: #F8FAFC; }
     .stApp { max-width: 100%; }
-    .metric-container {
-        background: #1E293B;
-        border: 1px solid #334155;
-        padding: 12px;
-        border-radius: 10px;
-        text-align: center;
-    }
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 45px; background-color: #0EA5E9; color: white; border: none; }
     div.stButton > button:hover { background-color: #0284C7; }
 </style>
@@ -69,7 +63,7 @@ def save_scan_to_mysql(inspector, batch, roll, pos, lab, delta_e):
   return False
 
 
-# --- Fixed Voice Output Helper ---
+# --- Reliable Voice Output Helper ---
 def speak_voice(text):
   js_code = f"""
     <script>
@@ -81,7 +75,7 @@ def speak_voice(text):
         }}
     </script>
     """
-  st.html(js_code)
+  components.html(js_code, height=0)
 
 
 # --- Session State ---
@@ -277,27 +271,38 @@ if nav_choice == "🔍 Real-time Inspection":
         (0, 255, 255),
         2,
     )
-    st.image(img_rgb, width=320)
+    st.image(img_rgb, width=300)
 
     current_lab = rgb_to_lab(cv2.mean(roi)[:3])
     scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
     base_lab = scans[0]["lab"] if len(scans) > 0 else current_lab
     metrics = get_details(base_lab, current_lab)
 
-    # --- HORIZONTAL VALUES ROW ---
-    st.markdown("### 📊 Instant Color Metrics")
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("ΔL*", f"{metrics['dL']}", metrics["l_comm"])
-    m2.metric("Δa*", f"{metrics['da']}", metrics["rg_comm"])
-    m3.metric("Δb*", f"{metrics['db']}", metrics["yb_comm"])
-    m4.metric("ΔC*", f"{metrics['dC']}")
-    m5.metric("ΔH*", f"{metrics['dH']}")
-    m6.metric(
-        "ΔE2000",
-        f"{metrics['de']}",
-        "PASS" if metrics["de"] <= 1.0 else "FAIL",
-        delta_color="inverse",
+    # --- PRIMARY METRIC DISPLAY (ΔE2000 Focus) ---
+    de_val = metrics["de"]
+    is_pass = de_val <= 1.0
+    status_text = "PASS (Within Spec)" if is_pass else "FAIL (Out of Spec)"
+    status_color = "#059669" if is_pass else "#DC2626"
+
+    st.markdown(
+        f"""
+        <div style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border: 2px solid {status_color}; padding: 18px; border-radius: 14px; text-align: center; margin-top: 15px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
+            <div style="font-size: 12px; color: #94A3B8; font-weight: bold; letter-spacing: 1.5px;">PRIMARY COLOR METRIC</div>
+            <div style="font-size: 40px; font-weight: bold; color: #F8FAFC; margin: 5px 0;">ΔE2000 = {de_val}</div>
+            <span style="background-color: {status_color}; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;">{status_text}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
+
+    # --- SECONDARY METRICS (Compact view below) ---
+    with st.expander("🔍 View Secondary Vector Components (ΔL*, Δa*, Δb*, ΔC*, ΔH*)"):
+      m1, m2, m3, m4, m5 = st.columns(5)
+      m1.metric("ΔL*", f"{metrics['dL']}", metrics["l_comm"])
+      m2.metric("Δa*", f"{metrics['da']}", metrics["rg_comm"])
+      m3.metric("Δb*", f"{metrics['db']}", metrics["yb_comm"])
+      m4.metric("ΔC*", f"{metrics['dC']}")
+      m5.metric("ΔH*", f"{metrics['dH']}")
 
     if st.button("💾 Save Scan & Record to Database"):
       success = save_scan_to_mysql(
