@@ -11,7 +11,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 import streamlit as st
-import streamlit.components.v1 as components
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -21,11 +20,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- Custom Styling for Ultra-Fast Spectrophotometer UI ---
+# --- Professional Mobile-Responsive Styling ---
 st.markdown(
     """
 <style>
-    .main { background-color: #0E1117; }
+    .main { background-color: #0E1117; color: #F8FAFC; }
     .stApp { max-width: 100%; }
     .metric-card {
         background: linear-gradient(135deg, #1E2640 0%, #0F172A 100%);
@@ -35,9 +34,10 @@ st.markdown(
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         text-align: center;
     }
-    .status-badge-a { background-color: #059669; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
-    .status-badge-b { background-color: #D97706; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
-    .status-badge-c { background-color: #DC2626; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
+    .status-badge-a { background-color: #059669; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; }
+    .status-badge-b { background-color: #D97706; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; }
+    .status-badge-c { background-color: #DC2626; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; }
+    div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 45px; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -113,8 +113,8 @@ def login_gate():
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<h5 style='text-align: center; color: #94A3B8;'>International Grade"
-        " Real-Time Color Matching System</h5>",
+        "<h5 style='text-align: center; color: #94A3B8;'>Enterprise"
+        " Mobile-Optimized Color Quality Control</h5>",
         unsafe_allow_html=True,
     )
 
@@ -306,27 +306,28 @@ def get_quality_grade(avg_de, max_de):
 
 
 # --- Header & Live Clock ---
-h_col1, h_col2 = st.columns([2.5, 1.5])
+h_col1, h_col2 = st.columns([2.2, 1.8])
 
 with h_col1:
-  st.title("🎨 Ocean Lanka - AI Spectrophotometer Suite")
+  st.title("🎨 Ocean Lanka - AI Spectrophotometer")
   st.caption(
-      f"👤 Authenticated Inspector: **{st.session_state.user_name}** |"
-      " Real-time Optical Telemetry"
+      f"👤 Inspector: **{st.session_state.user_name}** | Mobile Optical"
+      " Telemetry"
   )
 
 with h_col2:
   clock_html = """
-    <div style="background: #1E293B; padding: 10px 15px; border-radius: 10px; border: 1px solid #0EA5E9; text-align: center;">
-        <span style="font-size: 12px; color: #94A3B8; font-weight: bold;">🇱🇰 SRI LANKA REAL-TIME</span><br>
-        <span id="live_clock" style="font-size: 16px; font-weight: bold; color: #38BDF8;">--:--:--</span>
+    <div style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); padding: 12px; border-radius: 12px; border: 1px solid #0EA5E9; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div style="font-size: 11px; color: #38BDF8; font-weight: bold; letter-spacing: 1px;">🇱🇰 SRI LANKA REAL-TIME TELEMETRY</div>
+        <div id="live_clock" style="font-size: 17px; font-weight: bold; color: #F8FAFC; margin-top: 4px;">Loading clock...</div>
     </div>
     <script>
         function updateClock() {
             var now = new Date();
             var options = { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
             var formatter = new Intl.DateTimeFormat('en-US', options);
-            document.getElementById('live_clock').innerHTML = formatter.format(now);
+            var el = document.getElementById('live_clock');
+            if (el) { el.innerHTML = formatter.format(now); }
         }
         setInterval(updateClock, 1000);
         updateClock();
@@ -365,13 +366,13 @@ if st.sidebar.button("🚪 Logout User"):
 if nav_choice == "🔍 Real-time Inspection":
   st.subheader(f"📍 Active Scan Point: Batch [{batch_no}] ➔ Roll [{roll_no}]")
 
-  col_cam, col_controls = st.columns([2, 1])
+  col_cam, col_controls = st.columns([1.5, 1])
 
   with col_controls:
-    st.markdown("#### 📷 Input Method")
+    st.markdown("#### 📷 Input Method & Settings")
     cam_source = st.radio(
         "Select Source:",
-        ["Live Real-time Camera Feed", "Upload Image File"],
+        ["Mobile / Standard Camera Input", "Upload Image File"],
     )
     position = st.selectbox(
         "Scan Position:",
@@ -390,7 +391,7 @@ if nav_choice == "🔍 Real-time Inspection":
       position = st.text_input("Type Distance (e.g., 25m):", value="25m")
 
     st.markdown("---")
-    st.markdown("#### ⚡ High-Speed Processing Mode")
+    st.markdown("#### ⚡ Processing Settings")
     enable_fast_processing = st.checkbox(
         "Instant Vector Processing (Zero-Lag)", value=True
     )
@@ -398,50 +399,15 @@ if nav_choice == "🔍 Real-time Inspection":
   with col_cam:
     captured_img = None
 
-    if cam_source == "Live Real-time Camera Feed":
-      st.markdown(
-          "🔴 **Real-time Live Camera View** (Align fabric sample inside the"
-          " central aperture target box)"
+    if cam_source == "Mobile / Standard Camera Input":
+      st.info(
+          "💡 **Mobile Tip:** Tap below to open your camera, align the central"
+          " target box on the fabric surface, and take the photo."
       )
-
-      # HTML5 live video streaming component with a central target reticle (spectrophotometer aperture style)
-      live_cam_html = """
-            <div style="text-align: center; position: relative; width: 100%; max-width: 480px; margin: auto;">
-                <video id="webcam" autoplay playsinline style="width: 100%; border-radius: 12px; border: 2px solid #0EA5E9; background: #000;"></video>
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 70px; border: 3px dashed #EAB308; border-radius: 8px; pointer-events: none; box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);">
-                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: #EF4444; border-radius: 50%;"></div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <button onclick="captureSnapshot()" style="background: #10B981; color: white; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer;">🎯 Capture Optical Reading</button>
-                </div>
-                <canvas id="canvas" style="display:none;"></canvas>
-            </div>
-
-            <script>
-                const video = document.getElementById('webcam');
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                    .then(stream => { video.srcObject = stream; })
-                    .catch(err => { console.error("Camera error:", err); });
-
-                function captureSnapshot() {
-                    const canvas = document.getElementById('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                    window.parent.postMessage({type: "streamlit:setComponentValue", value: dataUrl}, "*");
-                }
-            </script>
-            """
-      cam_data = components.html(live_cam_html, height=420)
-
-      if isinstance(cam_data, str) and "," in cam_data:
-        header, encoded = cam_data.split(",", 1)
-        img_bytes = base64.b64decode(encoded)
-        np_arr = np.frombuffer(img_bytes, np.uint8)
-        captured_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
+      photo = st.camera_input("📸 Capture Fabric Surface (Take Photo)")
+      if photo:
+        image = Image.open(photo)
+        captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     else:
       file_up = st.file_uploader(
           "Select Fabric Image", type=["jpg", "jpeg", "png"]
@@ -458,22 +424,22 @@ if nav_choice == "🔍 Real-time Inspection":
       img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
       h, w, _ = img_rgb.shape
 
-      # --- SPECTROPHOTOMETER TIGHT APERTURE EXTRACTION (Small Area Focus) ---
-      # Instead of a massive area, we sample a tight central target window (e.g., center 12% aperture spot)
-      box_size_h = int(h * 0.12)
-      box_size_w = int(w * 0.12)
-      center_y, center_x = h // 2, w // 2
+      # --- SPECTROPHOTOMETER TIGHT APERTURE EXTRACTION (Small Central Spot) ---
+      # Automatically focuses and crops only the central 15% aperture spot (no large area clutter)
+      aperture_h = int(h * 0.15)
+      aperture_w = int(w * 0.15)
+      cy, cx = h // 2, w // 2
 
       roi = img_rgb[
-          center_y - box_size_h // 2 : center_y + box_size_h // 2,
-          center_x - box_size_w // 2 : center_x + box_size_w // 2,
+          cy - aperture_h // 2 : cy + aperture_h // 2,
+          cx - aperture_w // 2 : cx + aperture_w // 2,
       ]
 
-      # Draw a precise targeting box on the preview image for verification
+      # Draw optical target reticle box on the preview image for verification
       cv2.rectangle(
           img_rgb,
-          (center_x - box_size_w // 2, center_y - box_size_h // 2),
-          (center_x + box_size_w // 2, center_y + box_size_h // 2),
+          (cx - aperture_w // 2, cy - aperture_h // 2),
+          (cx + aperture_w // 2, cy + aperture_h // 2),
           (0, 255, 255),
           2,
       )
@@ -484,13 +450,13 @@ if nav_choice == "🔍 Real-time Inspection":
       st.image(
           img_rgb,
           caption=(
-              f"Aperture Targeted Scan - {position} (Precision Small Area"
-              " Sample)"
+              f"Spectrophotometer Aperture View - {position} (Target Spot"
+              " Sampled)"
           ),
           width="stretch",
       )
       st.success(
-          f"⚡ Instant CIELAB Telemetry (Aperture Spot): L*={current_lab[0]},"
+          f"⚡ Instant CIELAB Telemetry (Target Spot): L*={current_lab[0]},"
           f" a*={current_lab[1]}, b*={current_lab[2]}"
       )
 
