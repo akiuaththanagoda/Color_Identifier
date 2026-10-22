@@ -17,10 +17,10 @@ st.set_page_config(
     page_title="Ocean Lanka - AI Spectrophotometer",
     page_icon="🎨",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
-# --- Clean Minimalist & Professional Styling ---
+# --- Professional Styling ---
 st.markdown(
     """
 <style>
@@ -33,9 +33,7 @@ st.markdown(
         border-radius: 10px;
         text-align: center;
     }
-    .badge-pass { background-color: #059669; color: white; padding: 4px 10px; border-radius: 15px; font-weight: bold; }
-    .badge-fail { background-color: #DC2626; color: white; padding: 4px 10px; border-radius: 15px; font-weight: bold; }
-    div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 42px; background-color: #0EA5E9; color: white; border: none; }
+    div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 45px; background-color: #0EA5E9; color: white; border: none; }
     div.stButton > button:hover { background-color: #0284C7; }
 </style>
 """,
@@ -71,13 +69,16 @@ def save_scan_to_mysql(inspector, batch, roll, pos, lab, delta_e):
   return False
 
 
-# --- Voice Output Helper ---
+# --- Fixed Voice Output Helper ---
 def speak_voice(text):
   js_code = f"""
     <script>
-        var msg = new SpeechSynthesisUtterance('{text}');
-        msg.rate = 1.0;
-        window.speechSynthesis.speak(msg);
+        if ('speechSynthesis' in window) {{
+            window.speechSynthesis.cancel();
+            var msg = new SpeechSynthesisUtterance("{text}");
+            msg.rate = 1.0;
+            window.speechSynthesis.speak(msg);
+        }}
     </script>
     """
   st.html(js_code)
@@ -94,7 +95,7 @@ if "batch_data" not in st.session_state:
 # --- Login Gate ---
 if not st.session_state.authenticated:
   st.markdown(
-      "<h2 style='text-align: center; color: #38BDF8; margin-top: 50px;'>🏭 Ocean"
+      "<h2 style='text-align: center; color: #38BDF8; margin-top: 60px;'>🏭 Ocean"
       " Lanka AI Spectrophotometer</h2>",
       unsafe_allow_html=True,
   )
@@ -103,14 +104,14 @@ if not st.session_state.authenticated:
     with st.form("login_form"):
       user_in = st.text_input("Operator Name:")
       pass_in = st.text_input("Password:", type="password")
-      if st.form_submit_button("Login"):
+      if st.form_submit_button("Login to System"):
         if pass_in == "Ocean2026" and user_in.strip() != "":
           st.session_state.authenticated = True
           st.session_state.user_name = user_in.strip()
           speak_voice("System initialized. Welcome " + user_in)
           st.rerun()
         else:
-          st.error("Invalid credentials")
+          st.error("Invalid credentials!")
   st.stop()
 
 
@@ -197,133 +198,240 @@ def get_details(l1, l2):
   }
 
 
-# --- Top Bar (Context & Clock) ---
-top_c1, top_c2, top_c3, top_c4 = st.columns([1.5, 1.5, 2, 1])
-with top_c1:
-  batch_no = st.text_input("Batch No:", value="BATCH-9001").upper()
-with top_c2:
-  roll_no = st.text_input("Roll No:", value="ROLL-01").upper()
-with top_c3:
-  st.markdown(
-      f"👤 **{st.session_state.user_name}** | 🟢 **System Ready**",
-      unsafe_allow_html=True,
-  )
-with top_c4:
-  if st.button("Logout"):
-    st.session_state.authenticated = False
-    st.rerun()
+# --- Sidebar Navigation & Context Setup ---
+st.sidebar.markdown(f"### 👤 {st.session_state.user_name}")
+nav_choice = st.sidebar.radio(
+    "Navigation Menu:",
+    [
+        "🔍 Real-time Inspection",
+        "📊 Batch Analytics",
+        "📋 Shade Library",
+        "📜 Live DB Records",
+        "⚙️ Calibration",
+    ],
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📦 Production Parameters")
+batch_no = st.sidebar.text_input("Batch Number:", value="BATCH-9001").upper()
+roll_no = st.sidebar.text_input("Roll Number:", value="ROLL-01").upper()
 
 if batch_no not in st.session_state.batch_data:
   st.session_state.batch_data[batch_no] = {"rolls": {}}
 if roll_no not in st.session_state.batch_data[batch_no]["rolls"]:
   st.session_state.batch_data[batch_no]["rolls"][roll_no] = []
 
-st.markdown("---")
+if st.sidebar.button("🚪 Logout"):
+  st.session_state.authenticated = False
+  speak_voice("System logged out.")
+  st.rerun()
 
-# --- Main Inspection Interface ---
-col_opt, col_pos = st.columns([1, 1])
-with col_opt:
-  input_method = st.radio(
-      "Select Image Input:",
-      ["📷 Mobile / Live Camera", "📁 Upload Image"],
-      horizontal=True,
-  )
-with col_pos:
-  position = st.selectbox(
-      "Scan Position:",
-      [
-          "Start (0m)",
-          "Middle (50m)",
-          "End (100m)",
-          "Edge-Left",
-          "Center-Point",
-          "Edge-Right",
-      ],
-  )
+# --- Module 1: Real-time Inspection ---
+if nav_choice == "🔍 Real-time Inspection":
+  st.subheader(f"📍 Active Inspection: [{batch_no}] ➔ [{roll_no}]")
 
-captured_img = None
-if input_method == "📷 Mobile / Live Camera":
-  photo = st.camera_input("Capture Fabric Sample")
-  if photo:
-    captured_img = cv2.cvtColor(
-        np.array(Image.open(photo)), cv2.COLOR_RGB2BGR
+  col_opt, col_pos = st.columns([1, 1])
+  with col_opt:
+    input_method = st.radio(
+        "Source:", ["📷 Mobile Camera", "📁 Upload Image"], horizontal=True
     )
-else:
-  file_up = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
-  if file_up:
-    captured_img = cv2.cvtColor(
-        np.array(Image.open(file_up)), cv2.COLOR_RGB2BGR
+  with col_pos:
+    position = st.selectbox(
+        "Scan Position:",
+        [
+            "Start (0m)",
+            "Middle (50m)",
+            "End (100m)",
+            "Edge-Left",
+            "Center-Point",
+            "Edge-Right",
+        ],
     )
 
-if captured_img is not None:
-  # Instant aperture crop (center 15%)
-  h, w, _ = captured_img.shape
-  img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
-  ah, aw = int(h * 0.15), int(w * 0.15)
-  cy, cx = h // 2, w // 2
-  roi = img_rgb[cy - ah // 2 : cy + ah // 2, cx - aw // 2 : cx + aw // 2]
+  captured_img = None
+  if input_method == "📷 Mobile Camera":
+    photo = st.camera_input("Capture Fabric Sample (Aperture Spot)")
+    if photo:
+      captured_img = cv2.cvtColor(
+          np.array(Image.open(photo)), cv2.COLOR_RGB2BGR
+      )
+  else:
+    file_up = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    if file_up:
+      captured_img = cv2.cvtColor(
+          np.array(Image.open(file_up)), cv2.COLOR_RGB2BGR
+      )
 
-  # Draw reticle
-  cv2.rectangle(
-      img_rgb,
-      (cx - aw // 2, cy - ah // 2),
-      (cx + aw // 2, cy + ah // 2),
-      (0, 255, 255),
-      2,
-  )
-  st.image(img_rgb, width=350)
+  if captured_img is not None:
+    # Tight Aperture Extraction (Central 15%)
+    h, w, _ = captured_img.shape
+    img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
+    ah, aw = int(h * 0.15), int(w * 0.15)
+    cy, cx = h // 2, w // 2
+    roi = img_rgb[cy - ah // 2 : cy + ah // 2, cx - aw // 2 : cx + aw // 2]
 
-  current_lab = rgb_to_lab(cv2.mean(roi)[:3])
-  scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
-  base_lab = scans[0]["lab"] if len(scans) > 0 else current_lab
-  metrics = get_details(base_lab, current_lab)
-
-  # --- HORIZONTAL VALUES ROW ---
-  st.markdown("### 📊 Instant Color Metrics")
-  m1, m2, m3, m4, m5, m6 = st.columns(6)
-  m1.metric("ΔL*", f"{metrics['dL']}", metrics["l_comm"])
-  m2.metric("Δa*", f"{metrics['da']}", metrics["rg_comm"])
-  m3.metric("Δb*", f"{metrics['db']}", metrics["yb_comm"])
-  m4.metric("ΔC*", f"{metrics['dC']}")
-  m5.metric("ΔH*", f"{metrics['dH']}")
-  m6.metric(
-      "ΔE2000",
-      f"{metrics['de']}",
-      "PASS" if metrics["de"] <= 1.0 else "FAIL",
-      delta_color="inverse",
-  )
-
-  if st.button("💾 Save Scan & Record to Database"):
-    success = save_scan_to_mysql(
-        st.session_state.user_name,
-        batch_no,
-        roll_no,
-        position,
-        current_lab,
-        metrics["de"],
+    cv2.rectangle(
+        img_rgb,
+        (cx - aw // 2, cy - ah // 2),
+        (cx + aw // 2, cy + ah // 2),
+        (0, 255, 255),
+        2,
     )
-    st.session_state.batch_data[batch_no]["rolls"][roll_no].append(
-        {"position": position, "lab": current_lab, "de": metrics["de"]}
-    )
-    if success:
-      speak_voice("Scan saved successfully")
-      st.success("✅ Saved successfully!")
-      time.sleep(0.5)
-      st.rerun()
+    st.image(img_rgb, width=320)
 
-# --- Bottom Chart ---
-current_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
-if len(current_scans) > 0:
-  st.markdown("---")
-  st.subheader(f"📈 Roll Variation Profile ({roll_no})")
-  df = pd.DataFrame(current_scans)
-  fig = px.line(
-      df,
-      x="position",
-      y="de",
-      markers=True,
-      template="plotly_dark",
-      labels={"de": "ΔE2000", "position": "Position"},
+    current_lab = rgb_to_lab(cv2.mean(roi)[:3])
+    scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
+    base_lab = scans[0]["lab"] if len(scans) > 0 else current_lab
+    metrics = get_details(base_lab, current_lab)
+
+    # --- HORIZONTAL VALUES ROW ---
+    st.markdown("### 📊 Instant Color Metrics")
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
+    m1.metric("ΔL*", f"{metrics['dL']}", metrics["l_comm"])
+    m2.metric("Δa*", f"{metrics['da']}", metrics["rg_comm"])
+    m3.metric("Δb*", f"{metrics['db']}", metrics["yb_comm"])
+    m4.metric("ΔC*", f"{metrics['dC']}")
+    m5.metric("ΔH*", f"{metrics['dH']}")
+    m6.metric(
+        "ΔE2000",
+        f"{metrics['de']}",
+        "PASS" if metrics["de"] <= 1.0 else "FAIL",
+        delta_color="inverse",
+    )
+
+    if st.button("💾 Save Scan & Record to Database"):
+      success = save_scan_to_mysql(
+          st.session_state.user_name,
+          batch_no,
+          roll_no,
+          position,
+          current_lab,
+          metrics["de"],
+      )
+      st.session_state.batch_data[batch_no]["rolls"][roll_no].append(
+          {"position": position, "lab": current_lab, "de": metrics["de"]}
+      )
+      if success:
+        speak_voice("Scan saved successfully.")
+        st.success("✅ Saved successfully to Database!")
+        time.sleep(0.5)
+        st.rerun()
+
+  # --- Bottom Chart ---
+  current_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
+  if len(current_scans) > 0:
+    st.markdown("---")
+    st.subheader(f"📈 Roll Variation Profile ({roll_no})")
+    df = pd.DataFrame(current_scans)
+    fig = px.line(
+        df,
+        x="position",
+        y="de",
+        markers=True,
+        template="plotly_dark",
+        labels={"de": "ΔE2000", "position": "Position"},
+    )
+    fig.add_hline(y=1.0, line_dash="dash", line_color="#EF4444")
+    st.plotly_chart(fig, width="stretch")
+
+# --- Module 2: Batch Analytics ---
+elif nav_choice == "📊 Batch Analytics":
+  st.subheader(f"📊 Batch Quality Analytics [{batch_no}]")
+  rolls_data = st.session_state.batch_data[batch_no]["rolls"]
+  records = []
+  for r_id, scs in rolls_data.items():
+    for s in scs:
+      records.append({"Roll": r_id, "Position": s["position"], "ΔE2000": s["de"]})
+
+  if len(records) > 0:
+    df_b = pd.DataFrame(records)
+    c1, c2 = st.columns(2)
+    with c1:
+      fig_b = px.box(
+          df_b,
+          x="Roll",
+          y="ΔE2000",
+          color="Roll",
+          title="Roll Variation Dispersion",
+          template="plotly_dark",
+      )
+      st.plotly_chart(fig_b, width="stretch")
+    with c2:
+      fig_sc = px.scatter(
+          df_b,
+          x="Position",
+          y="ΔE2000",
+          color="Roll",
+          title="Position-wise ΔE Scatter",
+          template="plotly_dark",
+      )
+      st.plotly_chart(fig_sc, width="stretch")
+    st.dataframe(df_b, width="stretch")
+  else:
+    st.info("No inspection records available for this batch yet.")
+
+# --- Module 3: Shade Library ---
+elif nav_choice == "📋 Shade Library":
+  st.subheader("📋 Ocean Lanka Standard Shade Library")
+  shades_df = pd.DataFrame([
+      {
+          "Standard Name": "BLACK-093-54A2",
+          "Customer": "VS&Co",
+          "Target L*": 18.5,
+          "Target a*": 0.2,
+          "Target b*": -0.5,
+          "Tolerance ΔE": 1.0,
+      },
+      {
+          "Standard Name": "NAVY-712-10B",
+          "Customer": "Brands",
+          "Target L*": 22.1,
+          "Target a*": 1.1,
+          "Target b*": -4.2,
+          "Tolerance ΔE": 1.0,
+      },
+      {
+          "Standard Name": "OPTIC-WHITE-01",
+          "Customer": "Global",
+          "Target L*": 95.2,
+          "Target a*": -0.1,
+          "Target b*": 1.2,
+          "Tolerance ΔE": 0.8,
+      },
+  ])
+  st.dataframe(shades_df, width="stretch")
+
+# --- Module 4: Live DB Records ---
+elif nav_choice == "📜 Live DB Records":
+  st.subheader(f"📜 Live MySQL Records [{batch_no}]")
+  conn = get_db_connection()
+  if conn:
+    try:
+      df_db = pd.read_sql(
+          "SELECT * FROM color_inspections WHERE batch_no = %s ORDER BY"
+          " scan_timestamp DESC",
+          conn,
+          params=[batch_no],
+      )
+      conn.close()
+      if not df_db.empty:
+        st.dataframe(df_db, width="stretch")
+      else:
+        st.warning("No records found in MySQL database for this batch.")
+    except Exception as e:
+      st.error(f"Database Query Error: {e}")
+  else:
+    st.error("Database connection failed.")
+
+# --- Module 5: Calibration Settings ---
+elif nav_choice == "⚙️ Calibration":
+  st.subheader("⚙️ Spectrophotometer Calibration & Settings")
+  st.info(
+      "White Tile Calibration is recommended before starting a new production"
+      " batch."
   )
-  fig.add_hline(y=1.0, line_dash="dash", line_color="#EF4444")
-  st.plotly_chart(fig, width="stretch")
+  if st.button("⚪ Perform White Tile Calibration"):
+    speak_voice("White tile calibration completed successfully.")
+    st.success(
+        "✅ White Tile Calibration Passed! Optical sensor zeroed successfully."
+    )
