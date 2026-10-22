@@ -103,6 +103,7 @@ if not st.session_state.authenticated:
           st.session_state.authenticated = True
           st.session_state.user_name = user_in.strip()
           speak_voice("System initialized. Welcome " + user_in)
+          time.sleep(2)  # Allow voice to finish before rerun
           st.rerun()
         else:
           st.error("Invalid credentials!")
@@ -218,6 +219,7 @@ if roll_no not in st.session_state.batch_data[batch_no]["rolls"]:
 if st.sidebar.button("🚪 Logout"):
   st.session_state.authenticated = False
   speak_voice("System logged out.")
+  time.sleep(1.5)
   st.rerun()
 
 # --- Module 1: Real-time Inspection ---
@@ -317,7 +319,8 @@ if nav_choice == "🔍 Real-time Inspection":
           {"position": position, "lab": current_lab, "de": metrics["de"]}
       )
       if success:
-        speak_voice("Scan saved successfully.")
+        speak_voice("Scan saved successfully to database.")
+        time.sleep(2)  # Allow voice to finish before rerun
         st.success("✅ Saved successfully to Database!")
         time.sleep(0.5)
         st.rerun()
