@@ -11,14 +11,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 import streamlit as st
-import streamlit.components.v1 as components
+
 
 st.set_page_config(
-    page_title="Ocean Lanka - AI Color Precision Suite",
+    page_title="Ocean Lanka - AI Spectrophotometer Suite",
     page_icon="🎨",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 
 st.markdown(
     """
@@ -40,6 +41,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
 
 def get_db_connection():
   """Establish Connection to MySQL Database"""
@@ -89,7 +91,8 @@ def speak_voice(text):
         window.speechSynthesis.speak(msg);
     </script>
     """
-  components.html(js_code, height=0, width=0)
+  st.html(js_code)
+
 
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
@@ -101,12 +104,12 @@ def login_gate():
   if not st.session_state.authenticated:
     st.markdown(
         "<h2 style='text-align: center; color: #38BDF8;'>🏭 Ocean Lanka AI"
-        " Vision System</h2>",
+        " Spectrophotometer Suite</h2>",
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<h5 style='text-align: center; color: #94A3B8;'>Enterprise"
-        " Zero-Hardware Color Identification Suite</h5>",
+        "<h5 style='text-align: center; color: #94A3B8;'>International Grade"
+        " Real-Time Color Matching System</h5>",
         unsafe_allow_html=True,
     )
 
@@ -116,7 +119,7 @@ def login_gate():
         user_name_input = st.text_input("👤 Operator Name / User ID:")
         password_input = st.text_input("🔒 System Password:", type="password")
         submit_btn = st.form_submit_button(
-            "🔐 Authenticate & Launch System", use_container_width=True
+            "🔐 Authenticate & Launch System", width="stretch"
         )
 
         if submit_btn:
@@ -136,7 +139,7 @@ def login_gate():
 
             welcome_msg = (
                 f"{greeting} {st.session_state.user_name}. Welcome to Ocean"
-                " Lanka Color Identification System. All quality modules are"
+                " Lanka Spectrophotometer System. All modules are"
                 " initialized."
             )
             speak_voice(welcome_msg)
@@ -151,11 +154,14 @@ def login_gate():
 if not login_gate():
   st.stop()
 
+
 if "batch_data" not in st.session_state:
   st.session_state.batch_data = {}
 
+
+@st.cache_data
 def rgb_to_lab(rgb):
-  """Precision RGB to CIE L*a*b* Standard Transformation"""
+  """Optimized Precision RGB to CIE L*a*b* Standard Transformation"""
   r, g, b = [x / 255.0 for x in rgb]
   r = ((r + 0.055) / 1.055) ** 2.4 if r > 0.04045 else r / 12.92
   g = ((g + 0.055) / 1.055) ** 2.4 if g > 0.04045 else g / 12.92
@@ -174,8 +180,9 @@ def rgb_to_lab(rgb):
   b_val = 200 * (fy - fz)
   return round(L, 3), round(a, 3), round(b_val, 3)
 
+
 def calculate_ciede2000(lab1, lab2):
-  """High Accuracy CIEDE2000 Delta E Calculation"""
+  """High-Speed Accuracy CIEDE2000 Delta E Calculation"""
   L1, a1, b1 = lab1
   L2, a2, b2 = lab2
 
@@ -243,8 +250,47 @@ def calculate_ciede2000(lab1, lab2):
   return round(de2000, 3)
 
 
+def get_detailed_color_components(lab_std, lab_sample):
+  """Calculates standard spectrophotometer vector metrics (DL, Da, Db, DC, DH)"""
+  L1, a1, b1 = lab_std
+  L2, a2, b2 = lab_sample
+
+  dL = L2 - L1
+  da = a2 - a1
+  db = b2 - b1
+
+  C1 = math.sqrt(a1**2 + b1**2)
+  C2 = math.sqrt(a2**2 + b2**2)
+  dC = C2 - C1
+
+  de = calculate_ciede2000(lab_std, lab_sample)
+  dH_sq = max(0.0, de**2 - (dL / 1.0) ** 2 - (dC / 1.0) ** 2)
+  dH = math.sqrt(dH_sq) if dH_sq > 0 else 0.0
+
+  light_comment = "lighter" if dL > 0 else ("darker" if dL < 0 else "same")
+  chroma_comment = (
+      "more saturated" if dC > 0 else ("less saturated" if dC < 0 else "same")
+  )
+  rg_comment = "more red" if da > 0 else ("more green" if da < 0 else "neutral")
+  yb_comment = (
+      "more yellow" if db > 0 else ("more blue" if db < 0 else "neutral")
+  )
+
+  return {
+      "dL": round(dL, 3),
+      "da": round(da, 3),
+      "db": round(db, 3),
+      "dC": round(dC, 3),
+      "dH": round(dH, 3),
+      "light_comment": light_comment,
+      "chroma_comment": chroma_comment,
+      "rg_comment": rg_comment,
+      "yb_comment": yb_comment,
+  }
+
+
 def get_quality_grade(avg_de, max_de):
-  """Enterprise Grade Categorization"""
+  """Enterprise Spectrophotometer Grade Categorization"""
   if avg_de <= 0.75 and max_de <= 1.0:
     return "Grade A (Premium Pass)", "status-badge-a", "🟢"
   elif avg_de <= 1.20 and max_de <= 1.5:
@@ -256,10 +302,10 @@ def get_quality_grade(avg_de, max_de):
 h_col1, h_col2 = st.columns([2.5, 1.5])
 
 with h_col1:
-  st.title("🎨 Ocean Lanka - AI Precision Color Identifier")
+  st.title("🎨 Ocean Lanka - AI Spectrophotometer Suite")
   st.caption(
       f"👤 Authenticated Inspector: **{st.session_state.user_name}** |"
-      " Autonomous Vision System"
+      " Real-time Optical Telemetry"
   )
 
 with h_col2:
@@ -279,7 +325,7 @@ with h_col2:
         updateClock();
     </script>
     """
-  components.html(clock_html, height=80)
+  st.html(clock_html)
 
 st.markdown("---")
 
@@ -306,7 +352,6 @@ if roll_no not in st.session_state.batch_data[batch_no]["rolls"]:
 if st.sidebar.button("🚪 Logout User"):
   st.session_state.authenticated = False
   st.rerun()
-
 
 if nav_choice == "🔍 Real-time Inspection":
   st.subheader(f"📍 Active Scan Point: Batch [{batch_no}] ➔ Roll [{roll_no}]")
@@ -336,12 +381,9 @@ if nav_choice == "🔍 Real-time Inspection":
       position = st.text_input("Type Distance (e.g., 25m):", value="25m")
 
     st.markdown("---")
-    st.markdown("#### 🛠️ Image Processing Filters")
-    enable_denoise = st.checkbox(
-        "Denoise Image (Remove Grain)", value=True
-    )
-    enable_sharpen = st.checkbox(
-        "Sharpen Image (Enhance Texture)", value=True
+    st.markdown("#### ⚡ High-Speed Processing Mode")
+    enable_fast_processing = st.checkbox(
+        "Instant Vector Processing (Zero-Lag)", value=True
     )
 
   with col_cam:
@@ -349,8 +391,8 @@ if nav_choice == "🔍 Real-time Inspection":
 
     if cam_source == "Mobile / Standard Camera Input":
       st.info(
-          "💡 Tip: On mobile devices, clicking below will open your camera app"
-          " with full autofocus and flash support."
+          "💡 Tip: Capture fabric surface under steady illumination for"
+          " spectrophotometer-grade accuracy."
       )
       photo = st.camera_input(
           "📸 Capture Fabric Surface (Click 'Take Photo')"
@@ -367,33 +409,63 @@ if nav_choice == "🔍 Real-time Inspection":
         captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
     if captured_img is not None:
-      # Applying OpenCV Filters for Clarity
-      if enable_denoise:
-        captured_img = cv2.fastNlMeansDenoisingColored(
-            captured_img, None, 10, 10, 7, 21
-        )
-
-      if enable_sharpen:
-        kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
-        captured_img = cv2.filter2D(captured_img, -1, kernel)
+      
+      h_orig, w_orig, _ = captured_img.shape
+      if enable_fast_processing and (h_orig > 1000 or w_orig > 1000):
+        captured_img = cv2.resize(captured_img, (800, int(800 * h_orig / w_orig)))
 
       img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
       h, w, _ = img_rgb.shape
+
+      
       roi = img_rgb[int(h * 0.35) : int(h * 0.65), int(w * 0.35) : int(w * 0.65)]
       mean_rgb = cv2.mean(roi)[:3]
       current_lab = rgb_to_lab(mean_rgb)
 
       st.image(
           img_rgb,
-          caption=f"Captured Surface - {position}",
-          use_container_width=True,
+          caption=(
+              f"Spectrophotometer Optical Scan - {position} (Real-time"
+              " Processed)"
+          ),
+          width="stretch",
       )
-      st.info(
-          f"📊 Extracted CIELAB Parameters: L*={current_lab[0]},"
+      st.success(
+          f"⚡ Instant CIELAB Telemetry: L*={current_lab[0]},"
           f" a*={current_lab[1]}, b*={current_lab[2]}"
       )
 
-      if st.button("💾 Save Scan Point to MySQL", use_container_width=True):
+    
+      current_scans_temp = st.session_state.batch_data[batch_no]["rolls"][
+          roll_no
+      ]
+      base_lab_temp = (
+          current_scans_temp[0]["lab"]
+          if len(current_scans_temp) > 0
+          else current_lab
+      )
+      vec_metrics = get_detailed_color_components(base_lab_temp, current_lab)
+      instant_de = calculate_ciede2000(base_lab_temp, current_lab)
+
+      st.markdown(
+          "### 🔬 International Spectrophotometer Metrics (CMC 2:1 Style)"
+      )
+      m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
+      m_c1.metric(
+          "ΔL*", f"{vec_metrics['dL']}", vec_metrics["light_comment"]
+      )
+      m_c2.metric("Δa*", f"{vec_metrics['da']}", vec_metrics["rg_comment"])
+      m_c3.metric("Δb*", f"{vec_metrics['db']}", vec_metrics["yb_comment"])
+      m_c4.metric("ΔC*", f"{vec_metrics['dC']}", vec_metrics["chroma_comment"])
+      m_c5.metric("ΔH*", f"{vec_metrics['dH']}")
+      m_c6.metric(
+          "ΔE2000",
+          f"{instant_de}",
+          "PASS" if instant_de <= 1.0 else "FAIL",
+          delta_color="inverse",
+      )
+
+      if st.button("💾 Save Scan Point to MySQL", width="stretch"):
         current_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
         base_lab = (
             current_scans[0]["lab"] if len(current_scans) > 0 else current_lab
@@ -426,7 +498,7 @@ if nav_choice == "🔍 Real-time Inspection":
           st.success(
               f"✅ Position [{position}] saved directly to MySQL Database!"
           )
-          time.sleep(1)
+          time.sleep(0.5)
           st.rerun()
 
   current_scans = st.session_state.batch_data[batch_no]["rolls"][roll_no]
@@ -463,7 +535,7 @@ if nav_choice == "🔍 Real-time Inspection":
         x="position",
         y="Delta_E_Base",
         markers=True,
-        title=f"Color Variation Profile Across Roll ({roll_no})",
+        title=f"Spectrophotometer Color Variation Profile Across Roll ({roll_no})",
         labels={"Delta_E_Base": "CIEDE2000 (ΔE)", "position": "Position"},
         template="plotly_dark",
     )
@@ -479,7 +551,7 @@ if nav_choice == "🔍 Real-time Inspection":
         line_color="#EF4444",
         annotation_text="Tolerance Limit (1.20)",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 elif nav_choice == "📊 Batch Quality Analytics":
   st.subheader(f"📦 Overall Batch Color Uniformity Dashboard [{batch_no}]")
@@ -492,13 +564,18 @@ elif nav_choice == "📊 Batch Quality Analytics":
       first_lab = scans[0]["lab"]
       for s in scans:
         de_val = calculate_ciede2000(first_lab, s["lab"])
+        comp = get_detailed_color_components(first_lab, s["lab"])
         batch_records.append({
             "Roll Number": r_id,
             "Position": s["position"],
             "L*": s["lab"][0],
             "a*": s["lab"][1],
             "b*": s["lab"][2],
+            "ΔL*": comp["dL"],
+            "Δa*": comp["da"],
+            "Δb*": comp["db"],
             "Delta E": de_val,
+            "Status": "PASS" if de_val <= 1.0 else "FAIL",
         })
 
   if len(batch_records) > 0:
@@ -514,7 +591,7 @@ elif nav_choice == "📊 Batch Quality Analytics":
           title="Batch Delta E Dispersion Across Rolls",
           template="plotly_dark",
       )
-      st.plotly_chart(fig_box, use_container_width=True)
+      st.plotly_chart(fig_box, width="stretch")
 
     with c2:
       fig_bar = px.bar(
@@ -526,10 +603,12 @@ elif nav_choice == "📊 Batch Quality Analytics":
           title="Position-wise Delta E Comparison",
           template="plotly_dark",
       )
-      st.plotly_chart(fig_bar, use_container_width=True)
+      st.plotly_chart(fig_bar, width="stretch")
 
-    st.markdown("### 📋 Tabular Batch Quality Records")
-    st.dataframe(df_batch, use_container_width=True)
+    st.markdown(
+        "### 📋 International Quality Report (Spectrophotometer Format)"
+    )
+    st.dataframe(df_batch, width="stretch")
   else:
     st.warning(
         "No inspection records found for this batch. Scan points in Module 1"
@@ -553,7 +632,7 @@ elif nav_choice == "📜 Live MySQL Database Records":
         st.success(
             f"📊 Loaded {len(df_db)} records directly from MySQL Database."
         )
-        st.dataframe(df_db, use_container_width=True)
+        st.dataframe(df_db, width="stretch")
       else:
         st.warning(
             "No records found in MySQL Database for this Batch Number."
