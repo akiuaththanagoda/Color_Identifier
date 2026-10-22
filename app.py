@@ -11,8 +11,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 import streamlit as st
+import streamlit.components.v1 as components
 
-
+# --- Page Configuration ---
 st.set_page_config(
     page_title="Ocean Lanka - AI Spectrophotometer Suite",
     page_icon="🎨",
@@ -20,7 +21,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-
+# --- Custom Styling for Ultra-Fast Spectrophotometer UI ---
 st.markdown(
     """
 <style>
@@ -43,6 +44,7 @@ st.markdown(
 )
 
 
+# --- MySQL Database Helpers ---
 def get_db_connection():
   """Establish Connection to MySQL Database"""
   try:
@@ -81,6 +83,8 @@ def save_scan_to_mysql(inspector, batch, roll, pos, lab, delta_e):
       return False
   return False
 
+
+# --- Voice Output Helper ---
 def speak_voice(text):
   """Synthesizes Speech via Browser Speech API"""
   js_code = f"""
@@ -94,6 +98,7 @@ def speak_voice(text):
   st.html(js_code)
 
 
+# --- Session State & Authentication Gate ---
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 if "user_name" not in st.session_state:
@@ -154,11 +159,12 @@ def login_gate():
 if not login_gate():
   st.stop()
 
-
+# Initialize Batch Session State Data Structure
 if "batch_data" not in st.session_state:
   st.session_state.batch_data = {}
 
 
+# --- High-Performance Optimized Color Math ---
 @st.cache_data
 def rgb_to_lab(rgb):
   """Optimized Precision RGB to CIE L*a*b* Standard Transformation"""
@@ -299,6 +305,7 @@ def get_quality_grade(avg_de, max_de):
     return "Grade C (Reject / Out of Spec)", "status-badge-c", "🔴"
 
 
+# --- Header & Live Clock ---
 h_col1, h_col2 = st.columns([2.5, 1.5])
 
 with h_col1:
@@ -329,6 +336,7 @@ with h_col2:
 
 st.markdown("---")
 
+# --- Sidebar Controls ---
 st.sidebar.markdown("### ⚙️ Control Panel")
 nav_choice = st.sidebar.radio(
     "Navigation Module:",
@@ -353,6 +361,7 @@ if st.sidebar.button("🚪 Logout User"):
   st.session_state.authenticated = False
   st.rerun()
 
+# --- Module 1: Real-Time Inspection ---
 if nav_choice == "🔍 Real-time Inspection":
   st.subheader(f"📍 Active Scan Point: Batch [{batch_no}] ➔ Roll [{roll_no}]")
 
@@ -362,7 +371,7 @@ if nav_choice == "🔍 Real-time Inspection":
     st.markdown("#### 📷 Input Method")
     cam_source = st.radio(
         "Select Source:",
-        ["Mobile / Standard Camera Input", "Upload Image File"],
+        ["Live Real-time Camera Feed", "Upload Image File"],
     )
     position = st.selectbox(
         "Scan Position:",
@@ -389,17 +398,50 @@ if nav_choice == "🔍 Real-time Inspection":
   with col_cam:
     captured_img = None
 
-    if cam_source == "Mobile / Standard Camera Input":
-      st.info(
-          "💡 Tip: Capture fabric surface under steady illumination for"
-          " spectrophotometer-grade accuracy."
+    if cam_source == "Live Real-time Camera Feed":
+      st.markdown(
+          "🔴 **Real-time Live Camera View** (Align fabric sample inside the"
+          " central aperture target box)"
       )
-      photo = st.camera_input(
-          "📸 Capture Fabric Surface (Click 'Take Photo')"
-      )
-      if photo:
-        image = Image.open(photo)
-        captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+
+      # HTML5 live video streaming component with a central target reticle (spectrophotometer aperture style)
+      live_cam_html = """
+            <div style="text-align: center; position: relative; width: 100%; max-width: 480px; margin: auto;">
+                <video id="webcam" autoplay playsinline style="width: 100%; border-radius: 12px; border: 2px solid #0EA5E9; background: #000;"></video>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 70px; border: 3px dashed #EAB308; border-radius: 8px; pointer-events: none; box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);">
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: #EF4444; border-radius: 50%;"></div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="captureSnapshot()" style="background: #10B981; color: white; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer;">🎯 Capture Optical Reading</button>
+                </div>
+                <canvas id="canvas" style="display:none;"></canvas>
+            </div>
+
+            <script>
+                const video = document.getElementById('webcam');
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                    .then(stream => { video.srcObject = stream; })
+                    .catch(err => { console.error("Camera error:", err); });
+
+                function captureSnapshot() {
+                    const canvas = document.getElementById('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                    window.parent.postMessage({type: "streamlit:setComponentValue", value: dataUrl}, "*");
+                }
+            </script>
+            """
+      cam_data = components.html(live_cam_html, height=420)
+
+      if isinstance(cam_data, str) and "," in cam_data:
+        header, encoded = cam_data.split(",", 1)
+        img_bytes = base64.b64decode(encoded)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        captured_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
     else:
       file_up = st.file_uploader(
           "Select Fabric Image", type=["jpg", "jpeg", "png"]
@@ -409,7 +451,6 @@ if nav_choice == "🔍 Real-time Inspection":
         captured_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
     if captured_img is not None:
-      
       h_orig, w_orig, _ = captured_img.shape
       if enable_fast_processing and (h_orig > 1000 or w_orig > 1000):
         captured_img = cv2.resize(captured_img, (800, int(800 * h_orig / w_orig)))
@@ -417,25 +458,43 @@ if nav_choice == "🔍 Real-time Inspection":
       img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
       h, w, _ = img_rgb.shape
 
-      
-      roi = img_rgb[int(h * 0.35) : int(h * 0.65), int(w * 0.35) : int(w * 0.65)]
+      # --- SPECTROPHOTOMETER TIGHT APERTURE EXTRACTION (Small Area Focus) ---
+      # Instead of a massive area, we sample a tight central target window (e.g., center 12% aperture spot)
+      box_size_h = int(h * 0.12)
+      box_size_w = int(w * 0.12)
+      center_y, center_x = h // 2, w // 2
+
+      roi = img_rgb[
+          center_y - box_size_h // 2 : center_y + box_size_h // 2,
+          center_x - box_size_w // 2 : center_x + box_size_w // 2,
+      ]
+
+      # Draw a precise targeting box on the preview image for verification
+      cv2.rectangle(
+          img_rgb,
+          (center_x - box_size_w // 2, center_y - box_size_h // 2),
+          (center_x + box_size_w // 2, center_y + box_size_h // 2),
+          (0, 255, 255),
+          2,
+      )
+
       mean_rgb = cv2.mean(roi)[:3]
       current_lab = rgb_to_lab(mean_rgb)
 
       st.image(
           img_rgb,
           caption=(
-              f"Spectrophotometer Optical Scan - {position} (Real-time"
-              " Processed)"
+              f"Aperture Targeted Scan - {position} (Precision Small Area"
+              " Sample)"
           ),
           width="stretch",
       )
       st.success(
-          f"⚡ Instant CIELAB Telemetry: L*={current_lab[0]},"
+          f"⚡ Instant CIELAB Telemetry (Aperture Spot): L*={current_lab[0]},"
           f" a*={current_lab[1]}, b*={current_lab[2]}"
       )
 
-    
+      # --- SPECTROPHOTOMETER VECTOR METRICS DISPLAY ---
       current_scans_temp = st.session_state.batch_data[batch_no]["rolls"][
           roll_no
       ]
@@ -553,6 +612,8 @@ if nav_choice == "🔍 Real-time Inspection":
     )
     st.plotly_chart(fig, width="stretch")
 
+
+# --- Module 2: Batch Analytics ---
 elif nav_choice == "📊 Batch Quality Analytics":
   st.subheader(f"📦 Overall Batch Color Uniformity Dashboard [{batch_no}]")
 
@@ -615,6 +676,8 @@ elif nav_choice == "📊 Batch Quality Analytics":
         " first."
     )
 
+
+# --- Module 3: Live Database Records ---
 elif nav_choice == "📜 Live MySQL Database Records":
   st.subheader(f"📄 Live MySQL Inspection Records [{batch_no}]")
 
